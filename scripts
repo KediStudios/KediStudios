@@ -101,9 +101,9 @@ checkKeyBtn.MouseButton1Click:Connect(function()
 end)
 
 getKeyBtn.MouseButton1Click:Connect(function()
-    setclipboard("https://t.me/deltaversions")
-    showNotification("Ссылка скопирована!", 2)
+    setclipboard("https://discord.gg/a3HQcK5ZSF")
+    showNotification("Copied!", 2)
 end)
 
---// Инициализация
+--// Anahtar Kabullenme
 fetchKeys()
