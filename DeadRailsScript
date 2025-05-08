@@ -1,0 +1,207 @@
+--// Dead Rails Script Original
+local Groups = {
+    ["Eşyalar, Items"] = { "Prop_GoldBar", "Coal", "MoneyBag", "Bottle", "LeftUpperLeg", "Jar" },
+    ["Silahlar, Guns"] = { "Fuel", "Saddle", "RifleAmmo", "RevolverAmmo", "ShotgunShells", "Hadle", "Pump", "Cylinder", "Dynamite" },
+    ["Zombiler, Zombies"] = { "HumanoidRootPart" }
+}
+
+local ESPDistance = 1000
+local Players = game:GetService("Players")
+local lp = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+local RunService = game:GetService("RunService")
+local Toggles = {}
+local Drawings = {}
+local Enabled = true
+
+--// ESP
+local gui = Instance.new("ScreenGui", game.CoreGui)
+gui.Name = "ESP_GUI"
+
+local main = Instance.new("Frame", gui)
+main.Position = UDim2.new(0, 20, 0.5, -80)
+main.Size = UDim2.new(0, 220, 0, 200)
+main.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+main.BorderSizePixel = 0
+main.Visible = true
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
+
+local close = Instance.new("TextButton", main)
+close.Size = UDim2.new(0, 24, 0, 24)
+close.Position = UDim2.new(1, -28, 0, 4)
+close.Text = "X"
+close.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+Instance.new("UICorner", close).CornerRadius = UDim.new(1, 0)
+
+local openBtn = Instance.new("TextButton", gui)
+openBtn.Size = UDim2.new(0, 60, 0, 30)
+openBtn.Position = UDim2.new(0, 20, 0.5, -15)
+openBtn.Text = "Open, Aç"
+openBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+Instance.new("UICorner", openBtn).CornerRadius = UDim.new(0, 8)
+openBtn.Visible = false
+
+close.MouseButton1Click:Connect(function()
+    main.Visible = false
+    openBtn.Visible = true
+end)
+
+openBtn.MouseButton1Click:Connect(function()
+    main.Visible = true
+    openBtn.Visible = false
+end)
+
+--// Создание тумблеров
+local function createToggle(name, order)
+    Toggles[name] = true
+    local holder = Instance.new("Frame", main)
+    holder.Size = UDim2.new(1, -20, 0, 30)
+    holder.Position = UDim2.new(0, 10, 0, 10 + (order - 1) * 35)
+    holder.BackgroundTransparency = 1
+
+    local label = Instance.new("TextLabel", holder)
+    label.Size = UDim2.new(0.6, 0, 1, 0)
+    label.Text = name
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.BackgroundTransparency = 1
+    label.TextXAlignment = Enum.TextXAlignment.Left
+
+    local toggle = Instance.new("TextButton", holder)
+    toggle.Size = UDim2.new(0, 50, 0, 25)
+    toggle.Position = UDim2.new(1, -60, 0.5, -12)
+    toggle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    toggle.BorderSizePixel = 0
+    toggle.Text = ""
+
+    local circle = Instance.new("Frame", toggle)
+    circle.Size = UDim2.new(0, 20, 0, 20)
+    circle.Position = UDim2.new(1, -22, 0, 2)
+    circle.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+    circle.BorderSizePixel = 0
+    Instance.new("UICorner", toggle).CornerRadius = UDim.new(0, 12)
+    Instance.new("UICorner", circle).CornerRadius = UDim.new(1, 0)
+
+    toggle.MouseButton1Click:Connect(function()
+        Toggles[name] = not Toggles[name]
+        if Toggles[name] then
+            circle:TweenPosition(UDim2.new(1, -22, 0, 2), "Out", "Sine", 0.2, true)
+            circle.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+        else
+            circle:TweenPosition(UDim2.new(0, 2, 0, 2), "Out", "Sine", 0.2, true)
+            circle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        end
+    end)
+end
+
+-- Создаем тумблеры
+local order = 1
+for group, _ in pairs(Groups) do
+    createToggle(group, order)
+    order += 1
+end
+createToggle("Линии", order)
+
+-- Проверка тулза
+local function isToolOutsideBackpack(obj)
+    return obj:IsA("Tool") and obj.Parent and not obj:IsDescendantOf(lp.Backpack)
+end
+
+-- Создание ESP-объекта
+local function createBox(obj, group)
+    local box = Drawing.new("Square")
+    box.Thickness = 1
+    box.Color = Color3.new(1, 1, 1)
+    box.Transparency = 1
+    box.Visible = false
+
+    local line = Drawing.new("Line")
+    line.Thickness = 1
+    line.Color = Color3.new(1, 0, 0)
+    line.Transparency = 1
+    line.Visible = false
+
+    local label = Drawing.new("Text")
+    label.Size = 13
+    label.Center = true
+    label.Outline = true
+    label.Color = Color3.new(1, 1, 1)
+    label.Transparency = 1
+    label.Visible = false
+    label.Text = obj.Name
+
+    Drawings[obj] = { box = box, line = line, text = label, group = group }
+end
+
+-- Удаление ESP-объекта
+local function removeBox(obj)
+    if Drawings[obj] then
+        Drawings[obj].box:Remove()
+        Drawings[obj].line:Remove()
+        Drawings[obj].text:Remove()
+        Drawings[obj] = nil
+    end
+end
+
+-- Обновление ESP
+RunService.RenderStepped:Connect(function()
+    if not Enabled then return end
+
+    for obj, _ in pairs(Drawings) do
+        if not obj or not obj.Parent then
+            removeBox(obj)
+        end
+    end
+
+    for group, names in pairs(Groups) do
+        if Toggles[group] then
+            for _, name in ipairs(names) do
+                for _, obj in ipairs(workspace:GetDescendants()) do
+                    if obj.Name == name then
+                        if name == "Hadle" and not isToolOutsideBackpack(obj) then
+                            continue
+                        end
+                        if not Drawings[obj] then
+                            createBox(obj, group)
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    for obj, data in pairs(Drawings) do
+        if Toggles[data.group] and obj:IsA("BasePart") then
+            local pos, onScreen = camera:WorldToViewportPoint(obj.Position)
+            local sizeY = camera:WorldToViewportPoint(obj.Position + Vector3.new(1, 2, 0)).Y - pos.Y
+            local screenPos = Vector2.new(pos.X, pos.Y)
+            local boxSize = Vector2.new(sizeY, sizeY * 1.5)
+
+            if (lp.Character and lp:DistanceFromCharacter(obj.Position) < ESPDistance) then
+                data.box.Size = boxSize
+                data.box.Position = screenPos - boxSize / 2
+                data.box.Visible = onScreen
+
+                data.text.Position = screenPos + Vector2.new(0, (boxSize.Y / 2) + 5)
+                data.text.Visible = onScreen
+
+                if Toggles["Линии"] then
+                    data.line.From = Vector2.new(camera.ViewportSize.X / 2, 0)
+                    data.line.To = screenPos
+                    data.line.Visible = onScreen
+                else
+                    data.line.Visible = false
+                end
+            else
+                data.box.Visible = false
+                data.line.Visible = false
+                data.text.Visible = false
+            end
+        else
+            data.box.Visible = false
+            data.line.Visible = false
+            data.text.Visible = false
+        end
+    end
+end)
+
+print("[ESP] Скрипт запущен")
